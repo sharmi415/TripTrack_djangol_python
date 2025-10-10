@@ -1,12 +1,10 @@
 <h2>Upcoming Tours</h2>
-
 <ul>
   {% for tour in tours %}
     <li>
-      <strong>{{ tour.name }}</strong>
-      ({{ tour.start_date }} to {{ tour.end_date }}) - ${{ tour.cost }} <br>
-      Duration: {{ tour_duration(tour.start_date, tour.end_date) }} days <br>
-      Status: {% if is_tour_active(tour) %}Active{% else %}Inactive{% endif %}
+      <strong>{{ tour.name }}</strong> ({{ tour.start_date }} to {{ tour.end_date }}) - ${{ tour.cost }} <br>
+      Location: {{ tour.location }} <br>
+      Status: {{ tour.status }}
     </li>
   {% empty %}
     <li>No tours available.</li>

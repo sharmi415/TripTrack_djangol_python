@@ -1,16 +1,17 @@
-from django.shortcuts import render, redirect
-from django.contrib.auth import login, logout
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import get_user_model
 from django.contrib import messages
+from datetime import date
 
 from .forms import SignUpForm, HireForm
 from .models import Hire
 from tours.models import Tour
 
 User = get_user_model()
-
 
 # ---------------- Signup ----------------
 def signup_view(request):
@@ -20,6 +21,8 @@ def signup_view(request):
             user = form.save()
             login(request, user)
             messages.success(request, "Account created successfully!")
+
+            # Redirect based on role
             if user.role == "developer_admin" or user.is_superuser:
                 return redirect("developer_dashboard")
             elif user.role == "user_admin" or user.is_staff:
@@ -41,6 +44,8 @@ def login_view(request):
             user = form.get_user()
             login(request, user)
             messages.success(request, f"Welcome, {user.username}!")
+
+            # Redirect based on role
             if user.role == "developer_admin" or user.is_superuser:
                 return redirect("developer_dashboard")
             elif user.role == "user_admin" or user.is_staff:
@@ -55,14 +60,16 @@ def login_view(request):
 
 
 # ---------------- Logout ----------------
+@login_required
 def logout_view(request):
     logout(request)
     messages.info(request, "You have been logged out.")
-    return render(request, "user_accounts/logout.html")
+    return redirect("login")
 
 
 # ---------------- Developer Dashboard ----------------
 @login_required
+@user_passes_test(lambda u: u.role == "developer_admin")
 def developer_dashboard(request):
     user_admins = User.objects.filter(role="user_admin")
     user_admins_data = []
@@ -74,7 +81,7 @@ def developer_dashboard(request):
             "email": ua.email,
             "hire_start": getattr(hire_info, "start_date", None),
             "hire_end": getattr(hire_info, "end_date", None),
-            "duration_days": hire_info.duration_days() if hire_info else 0,
+            "duration_days": (hire_info.end_date - hire_info.start_date).days if hire_info else 0,
             "paid": getattr(hire_info, "paid", False),
         })
 
@@ -82,9 +89,9 @@ def developer_dashboard(request):
     return render(request, "user_accounts/dashboards/developer_dashboard.html", context)
 
 
-# ---------------- Hire Website (User Admin Only) ----------------
+# ---------------- Hire Form (User Admin Only) ----------------
 @login_required
-@user_passes_test(lambda u: u.role == "user_admin" or u.is_staff)
+@user_passes_test(lambda u: u.role == "user_admin")
 def hire_website(request):
     if request.method == "POST":
         form = HireForm(request.POST)
@@ -103,10 +110,20 @@ def hire_website(request):
 
 # ---------------- User Admin Dashboard ----------------
 @login_required
-@user_passes_test(lambda u: u.role == "user_admin" or u.is_staff)
+@user_passes_test(lambda u: u.role == 'user_admin')
 def user_admin_dashboard(request):
-    tours = Tour.objects.all()
-    return render(request, "user_accounts/dashboards/user_admin_dashboard.html", {"tours": tours})
+    # Check if user admin hire period is active
+    hire = Hire.objects.filter(user_admin=request.user, paid=True).order_by('-start_date').first()
+    today = date.today()
+    can_manage_tours = hire and hire.start_date <= today <= hire.end_date
+
+    tours = Tour.objects.filter(created_by=request.user) if can_manage_tours else []
+
+    context = {
+        "can_manage_tours": can_manage_tours,
+        "tours": tours
+    }
+    return render(request, "user_accounts/dashboards/user_admin_dashboard.html", context)
 
 
 # ---------------- Normal User Dashboard ----------------

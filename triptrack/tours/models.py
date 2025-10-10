@@ -1,20 +1,27 @@
 from django.db import models
+from django.contrib.auth.models import User
+from datetime import date
+
+ROLE_CHOICES = [
+    ('developer_admin', 'Developer Admin'),
+    ('user_admin', 'User Admin'),
+    ('user', 'User'),
+]
 
 class Tour(models.Model):
-    STATUS_CHOICES = [
-        ('active', 'Active'),
-        ('inactive', 'Inactive')
-    ]
-
     name = models.CharField(max_length=200)
-    description = models.TextField(blank=True)
     start_date = models.DateField()
     end_date = models.DateField()
-    cost = models.DecimalField(max_digits=10, decimal_places=2)
-    seats_available = models.PositiveIntegerField()
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    cost = models.FloatField()
+    location = models.CharField(max_length=200)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    status = models.CharField(max_length=10, choices=[('inactive','Inactive'),('active','Active')], default='inactive')
 
-    def __str__(self):
+    def str(self):
         return self.name
+
+class Hire(models.Model):
+    user_admin = models.ForeignKey(User, on_delete=models.CASCADE)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    paid = models.BooleanField(default=False)
