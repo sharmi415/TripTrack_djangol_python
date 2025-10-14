@@ -1,14 +1,11 @@
-
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, logout, authenticate, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth import get_user_model
 from django.contrib import messages
 from datetime import date
 
-from .forms import SignUpForm, HireForm
-from .models import Hire
+from .forms import SignUpForm
 from tours.models import Tour
 
 User = get_user_model()
@@ -23,11 +20,11 @@ def signup_view(request):
             messages.success(request, "Account created successfully!")
 
             # Redirect based on role
-            if user.role == "developer_admin" or user.is_superuser:
+            if user.role == "developer":
                 return redirect("developer_dashboard")
-            elif user.role == "user_admin" or user.is_staff:
-                return redirect("user_admin_dashboard")
-            else:
+            elif user.role == "creator":
+                return redirect("creator_dashboard")
+            else:  # enjoyer
                 return redirect("user_dashboard")
         else:
             messages.error(request, "Please correct the errors below.")
@@ -46,11 +43,11 @@ def login_view(request):
             messages.success(request, f"Welcome, {user.username}!")
 
             # Redirect based on role
-            if user.role == "developer_admin" or user.is_superuser:
+            if user.role == "developer":
                 return redirect("developer_dashboard")
-            elif user.role == "user_admin" or user.is_staff:
-                return redirect("user_admin_dashboard")
-            else:
+            elif user.role == "creator":
+                return redirect("creator_dashboard")
+            else:  # enjoyer
                 return redirect("user_dashboard")
         else:
             messages.error(request, "Invalid username or password.")
@@ -69,74 +66,61 @@ def logout_view(request):
 
 # ---------------- Developer Dashboard ----------------
 @login_required
-@user_passes_test(lambda u: u.role == "developer_admin")
+@user_passes_test(lambda u: u.role == "developer")
 def developer_dashboard(request):
-    user_admins = User.objects.filter(role="user_admin")
-    user_admins_data = []
-
-    for ua in user_admins:
-        hire_info = Hire.objects.filter(user_admin=ua).order_by("-start_date").first()
-        user_admins_data.append({
-            "username": ua.username,
-            "email": ua.email,
-            "hire_start": getattr(hire_info, "start_date", None),
-            "hire_end": getattr(hire_info, "end_date", None),
-            "duration_days": (hire_info.end_date - hire_info.start_date).days if hire_info else 0,
-            "paid": getattr(hire_info, "paid", False),
-        })
-
-    context = {"user_admins_data": user_admins_data}
+    creators = User.objects.filter(role="creator")
+    context = {"creators": creators}
     return render(request, "user_accounts/dashboards/developer_dashboard.html", context)
 
 
-# ---------------- Hire Form (User Admin Only) ----------------
+# ---------------- Creator Dashboard ----------------
 @login_required
-@user_passes_test(lambda u: u.role == "user_admin")
-def hire_website(request):
+@user_passes_test(lambda u: u.role == "creator")
+def creator_dashboard(request):
+    tours = Tour.objects.filter(created_by=request.user)
+
     if request.method == "POST":
-        form = HireForm(request.POST)
-        if form.is_valid():
-            hire = form.save(commit=False)
-            hire.user_admin = request.user
-            hire.paid = True  # simulate payment confirmation
-            hire.save()
-            messages.success(request, "Website hire successful!")
-            return redirect("user_admin_dashboard")
-    else:
-        form = HireForm()
+        title = request.POST.get("title")
+        description = request.POST.get("description")
+        cost = request.POST.get("cost")
+        start_date = request.POST.get("start_date")
+        end_date = request.POST.get("end_date")
+        location = request.POST.get("location")
+        seats_available = request.POST.get("seats_available")
 
-    return render(request, "user_accounts/hire_website.html", {"form": form})
+        if title and description and cost and start_date and end_date and location and seats_available:
+            Tour.objects.create(
+                created_by=request.user,
+                name=title,
+                description=description,
+                cost=cost,
+                start_date=start_date,
+                end_date=end_date,
+                location=location,
+                seats_available=seats_available,
+                status="active"
+            )
+            messages.success(request, "Tour created successfully!")
+            return redirect("creator_dashboard")
+        else:
+            messages.error(request, "Please fill all fields.")
 
-
-# ---------------- User Admin Dashboard ----------------
-@login_required
-@user_passes_test(lambda u: u.role == 'user_admin')
-def user_admin_dashboard(request):
-    # Check if user admin hire period is active
-    hire = Hire.objects.filter(user_admin=request.user, paid=True).order_by('-start_date').first()
-    today = date.today()
-    can_manage_tours = hire and hire.start_date <= today <= hire.end_date
-
-    tours = Tour.objects.filter(created_by=request.user) if can_manage_tours else []
-
-    context = {
-        "can_manage_tours": can_manage_tours,
-        "tours": tours
-    }
-    return render(request, "user_accounts/dashboards/user_admin_dashboard.html", context)
+    return render(request, "user_accounts/dashboards/creator_dashboard.html", {"tours": tours})
 
 
-# ---------------- Normal User Dashboard ----------------
+# ---------------- Enjoyer Dashboard ----------------
 @login_required
 @user_passes_test(lambda u: u.role == "user")
 def user_dashboard(request):
     tours = Tour.objects.filter(status="active").order_by("start_date")
-    dashboard_features = [
-        "Secure Sign-Up and Login",
-        "View Upcoming Tours and Updates",
-        "Join Tours and Track Participation",
-        "Receive Reminders and Notifications"
-    ]
+    return render(request, "user_accounts/dashboards/user_dashboard.html", {"tours": tours})
 
-    context = {"tours": tours, "dashboard_features": dashboard_features}
-    return render(request, "user_accounts/dashboards/user_dashboard.html", context)
+
+# ---------------- Book Tour (Enjoyer) ----------------
+@login_required
+@user_passes_test(lambda u: u.role == "user")
+def book_tour(request, tour_id):
+    tour = get_object_or_404(Tour, id=tour_id)
+    # simulate payment
+    messages.success(request, f"You successfully booked '{tour.name}'!")
+    return redirect("user_dashboard")

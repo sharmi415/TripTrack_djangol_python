@@ -1,4 +1,5 @@
 from pathlib import Path
+import os  # ✅ added
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -29,13 +30,15 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'triptrack.urls'
 
+# ✅ FIXED TEMPLATE SECTION
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'triptrack', 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -65,14 +68,11 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+# ✅ STATIC FILE SETTINGS
 STATIC_URL = 'static/'
-import os
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "triptrack", "static")]  # fixed path
 
-
-#STATIC_URL = 'static/'
-#DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
+# ✅ LOGIN/LOGOUT SETTINGS
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'home'
 

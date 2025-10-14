@@ -5,11 +5,10 @@ from django.utils import timezone
 # --- Custom User Model ---
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
-        ("developer_admin", "Developer Admin"),
-        ("user_admin", "User Admin"),
-        ("user", "User"),
+        ('creator', 'Tour Creator'),
+        ('enjoyer', 'Tour Enjoyer'),
     )
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="user")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="enjoyer")
 
     def __str__(self):
         return self.username
